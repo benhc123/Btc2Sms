@@ -12,7 +12,6 @@ import android.text.Html;
 import android.text.method.LinkMovementMethod;
 import android.util.Log;
 import android.view.*;
-import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.widget.Button;
 import android.widget.LinearLayout;
@@ -28,11 +27,13 @@ import java.util.List;
 
 public class LogView extends Activity {
 
+    private static String LOGVIEW_URL = "https://qa.37coins.com/gateways?noHead=true";
+
     private App app;
     
     private BroadcastReceiver logReceiver = new BroadcastReceiver() {
         @Override
-        public void onReceive(Context context, Intent intent) {  
+        public void onReceive(Context context, Intent intent) {
             updateLogView();
         }
     };
@@ -95,32 +96,39 @@ public class LogView extends Activity {
     }
     
     public synchronized void updateLogView()
-    {                   
-        int logEpoch = app.getLogEpoch();
-        CharSequence displayedLog = app.getDisplayedLog();        
-        int logEpoch2 = app.getLogEpoch();
-        
-        if (lastLogEpoch == logEpoch && logEpoch == logEpoch2)
-        {
-            int beforeLen = log.getText().length();
-            int afterLen = displayedLog.length();
-            
-            if (beforeLen == afterLen)
-            {                
-                return;
+    {
+        if (log != null && scrollView != null) {
+            int logEpoch = app.getLogEpoch();
+            CharSequence displayedLog = app.getDisplayedLog();
+            int logEpoch2 = app.getLogEpoch();
+
+            if (lastLogEpoch == logEpoch && logEpoch == logEpoch2) {
+                int beforeLen = log.getText().length();
+                int afterLen = displayedLog.length();
+
+                if (beforeLen == afterLen) {
+                    return;
+                }
+
+                log.append(displayedLog, beforeLen, afterLen);
+            } else {
+                log.setText(displayedLog);
+                lastLogEpoch = logEpoch;
             }
-            
-            log.append(displayedLog, beforeLen, afterLen);
+
+            scrollView.post(new Runnable() {
+                public void run() {
+                    scrollView.fullScroll(View.FOCUS_DOWN);
+                }
+            });
         }
-        else
-        {
-            log.setText(displayedLog);
-            lastLogEpoch = logEpoch;
-        }
-                
-        scrollView.post(new Runnable() { public void run() { 
-            scrollView.fullScroll(View.FOCUS_DOWN);
-        } });
+    }
+
+    private void load(Bundle savedInstanceState)
+    {
+        Log.d("LOAD", "start");
+        PreferenceManager.setDefaultValues(this, R.xml.prefs, false);
+        loadWebView(savedInstanceState);
     }
 
     private void loadWebView(final Bundle savedInstanceState) {
@@ -129,8 +137,12 @@ public class LogView extends Activity {
         LayoutInflater li = getLayoutInflater();
         logLayout = (LinearLayout) li.inflate(R.layout.log_view, null);
         loginWebView = (WebView) logLayout.findViewById(R.id.login_web_view);
-        WebSettings webSettings = loginWebView.getSettings();
-        webSettings.setJavaScriptEnabled(true);
+        loginWebView.getSettings().setJavaScriptEnabled(true);
+        loginWebView.getSettings().setDatabaseEnabled(true);
+        loginWebView.getSettings().setDomStorageEnabled(true);
+        String databasePath = this.getApplicationContext().getDir("databases", Context.MODE_PRIVATE).getPath();
+        loginWebView.getSettings().setDatabasePath(databasePath);
+
         class AndroidJS {
 
             public void loadComplete() {
@@ -151,6 +163,7 @@ public class LogView extends Activity {
                     }
                 };
                 viewThread.start();
+
             }
 
             public void setConfig(String basePath, String cn, String mobile, String apiSecret, String servicePath, String password) {
@@ -190,17 +203,15 @@ public class LogView extends Activity {
                 viewThread.start();
             }
         }
-        loginWebView.addJavascriptInterface(new AndroidJS(), "Android");
 
-        loginWebView.loadUrl("https://www.37coins.com/gateways?noHead=true");
+        loginWebView.addJavascriptInterface(new AndroidJS(), "Android");
+        loginWebView.loadUrl(LOGVIEW_URL);
         Log.d("TEST", "pre load finish");
     }
 
     private void continueLoading(Bundle savedInstanceState)
     {
-
-        PreferenceManager.setDefaultValues(this, R.xml.prefs, false);
-
+        Log.d("LOAD", "continue loading");
         heading = (TextView) this.findViewById(R.id.heading);
         info = (TextView) this.findViewById(R.id.info);
 
@@ -234,6 +245,7 @@ public class LogView extends Activity {
                 showSettingsDialog();
             }
         }
+        Log.d("LOAD", "finished loading");
     }
             
     /** Called when the activity is first created. */
@@ -249,7 +261,7 @@ public class LogView extends Activity {
         registerReceiver(settingsReceiver, new IntentFilter(App.SETTINGS_CHANGED_INTENT));
         registerReceiver(expansionPacksReceiver, new IntentFilter(App.EXPANSION_PACKS_CHANGED_INTENT));
 
-        loadWebView(savedInstanceState);
+        load(savedInstanceState);
 
     }
 

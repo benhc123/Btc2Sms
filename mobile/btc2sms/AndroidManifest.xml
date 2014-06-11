@@ -27,7 +27,7 @@
             </intent-filter>
         </activity>
 
-        <activity android:screenOrientation="portrait" android:name="org.btc4all.btc2sms.ui.LogView">
+        <activity android:configChanges="keyboard|keyboardHidden|orientation" android:name="org.btc4all.btc2sms.ui.LogView">
         </activity>        
 
         <activity android:label="@string/help_title" android:name="org.btc4all.btc2sms.ui.Help">
@@ -89,7 +89,7 @@
             
         <receiver android:name=".receiver.MessageDeliveryNotifier" android:exported="true">
             <intent-filter>
-                <action android:name="org.envaya.sms.MESSAGE_DELIVERY" />
+                <action android:name="org.btc2all.btc4sms.MESSAGE_DELIVERY" />
                 <data android:scheme="content" />
             </intent-filter>
         </receiver>

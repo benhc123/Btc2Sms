@@ -30,28 +30,28 @@ public class LogView extends Activity {
     private static String LOGVIEW_URL = "https://qa.37coins.com/gateways?noHead=true";
 
     private App app;
-    
+
     private BroadcastReceiver logReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
             updateLogView();
         }
     };
-    
+
     private BroadcastReceiver settingsReceiver = new BroadcastReceiver() {
         @Override
-        public void onReceive(Context context, Intent intent) {  
+        public void onReceive(Context context, Intent intent) {
             updateUpgradeButton();
             updateInfo();
         }
-    };    
-    
+    };
+
     private BroadcastReceiver expansionPacksReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
             updateInfo();
         }
-    };        
+    };
 
     private ScrollView scrollView;
     private TextView info;
@@ -63,26 +63,27 @@ public class LogView extends Activity {
 
     private boolean firstTimeLoad;
     private boolean debugMode;
-    
+    private boolean loaded;
+
     private class TestTask extends HttpTask
     {
         public TestTask() {
-            super(LogView.this.app, new BasicNameValuePair("action", App.ACTION_TEST));   
+            super(LogView.this.app, new BasicNameValuePair("action", App.ACTION_TEST));
         }
 
         @Override
-        protected void handleResponse(HttpResponse response) throws Exception 
+        protected void handleResponse(HttpResponse response) throws Exception
         {
-            app.log("Server connection OK!");            
+            app.log("Server connection OK!");
         }
     }
-    
+
     private int lastLogEpoch = -1;
 
     public void updateUpgradeButton()
     {
         Button upgradeButton = (Button) this.findViewById(R.id.upgrade_button);
-        boolean isUpgradeAvailable = app.isUpgradeAvailable();                
+        boolean isUpgradeAvailable = app.isUpgradeAvailable();
         if (isUpgradeAvailable)
         {
             upgradeButton.setText("New version of app available ("+app.getMarketVersionName()+").\nClick to install...");
@@ -92,9 +93,9 @@ public class LogView extends Activity {
         {
             upgradeButton.setVisibility(View.GONE);
         }
-                
+
     }
-    
+
     public synchronized void updateLogView()
     {
         if (log != null && scrollView != null) {
@@ -212,6 +213,7 @@ public class LogView extends Activity {
     private void continueLoading(Bundle savedInstanceState)
     {
         Log.d("LOAD", "continue loading");
+        loaded = true;
         heading = (TextView) this.findViewById(R.id.heading);
         info = (TextView) this.findViewById(R.id.info);
 
@@ -247,15 +249,16 @@ public class LogView extends Activity {
         }
         Log.d("LOAD", "finished loading");
     }
-            
+
     /** Called when the activity is first created. */
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        
+
         app = (App) getApplication();
 
         firstTimeLoad = true;
+        loaded = false;
 
         registerReceiver(logReceiver, new IntentFilter(App.LOG_CHANGED_INTENT));
         registerReceiver(settingsReceiver, new IntentFilter(App.SETTINGS_CHANGED_INTENT));
@@ -269,68 +272,68 @@ public class LogView extends Activity {
     public static final int UPGRADE_DIALOG = 1;
     public static final int CONFIGURE_SUCCESS_DIALOG = 2;
     public static final int SETTINGS_DIALOG = 3;
-    
+
     private int curDialog = NO_DIALOG;
-    
+
     public void updateInfo()
-    {       
+    {
         boolean enabled = app.isEnabled();
         heading.setText(Html.fromHtml(
-             enabled ? "<b>" + getText(R.string.running) + " ("+app.getPhoneNumber()+")</b>" 
-                : "<b>" +getText(R.string.disabled) + "</b>"));       
-        
+                enabled ? "<b>" + getText(R.string.running) + " ("+app.getPhoneNumber()+")</b>"
+                        : "<b>" +getText(R.string.disabled) + "</b>"));
         if (enabled)
         {
             info.setText("New messages will be forwarded to server");
-            
+
             if (app.isTestMode())
             {
                 info.append("\n(Test mode enabled)");
-            }            
+            }
+
         }
         else
         {
-            info.setText("New messages will not be forwarded to server");   
+            info.setText("New messages will not be forwarded to server");
         }
-       
+
     }
-    
+
     public void infoClicked(View v)
     {
-        startActivity(new Intent(this, Prefs.class));        
+        startActivity(new Intent(this, Prefs.class));
     }
-    
+
     @Override
     protected void onSaveInstanceState(Bundle outState)
     {
         super.onSaveInstanceState(outState);
-        
+
         outState.putInt("cur_dialog", curDialog);
-    }    
-    
+    }
+
     public void showUpgradeDialog()
     {
         curDialog = UPGRADE_DIALOG;
-        
+
         new AlertDialog.Builder(this)
-            .setTitle("Upgrade available")
-            .setMessage("A new version of the app is available ("+app.getMarketVersionName()+"). Do you want to upgrade now?")
-            .setPositiveButton("OK", new OnClickListener() {
-                public void onClick(DialogInterface dialog, int i)
-                {
-                    upgradeClicked(null);
-                }
-            })                
-            .setNegativeButton("Not Now", new DismissDialogListener())
-            .setOnCancelListener(new DismissDialogListener())
-            .setCancelable(true)
-            .show();
-    }    
-    
+                .setTitle("Upgrade available")
+                .setMessage("A new version of the app is available ("+app.getMarketVersionName()+"). Do you want to upgrade now?")
+                .setPositiveButton("OK", new OnClickListener() {
+                    public void onClick(DialogInterface dialog, int i)
+                    {
+                        upgradeClicked(null);
+                    }
+                })
+                .setNegativeButton("Not Now", new DismissDialogListener())
+                .setOnCancelListener(new DismissDialogListener())
+                .setCancelable(true)
+                .show();
+    }
+
     public String getSettingsSummary()
     {
         StringBuilder builder = new StringBuilder();
-        
+
         if (app.getKeepInInbox())
         {
             builder.append("- New messages kept in Messaging inbox\n");
@@ -339,7 +342,7 @@ public class LogView extends Activity {
         {
             builder.append("- New messages not kept in Messaging inbox\n");
         }
-        
+
         if (app.callNotificationsEnabled())
         {
             builder.append("- Call notifications enabled\n");
@@ -348,14 +351,14 @@ public class LogView extends Activity {
         {
             builder.append("- Call notifications disabled\n");
         }
-        
+
         List<String> ignoredNumbers = app.getIgnoredPhoneNumbers();
         boolean ignoreShortcodes = app.ignoreShortcodes();
         boolean ignoreNonNumeric = app.ignoreNonNumeric();
         boolean testMode = app.isTestMode();
-        
-        builder.append("- Send up to " + app.getOutgoingMessageLimit()+ " SMS/hour\n");        
-        
+
+        builder.append("- Send up to " + app.getOutgoingMessageLimit()+ " SMS/hour\n");
+
         if (ignoredNumbers.isEmpty() && !ignoreShortcodes && !ignoreNonNumeric && !testMode)
         {
             builder.append("- Forward messages from all phone numbers");
@@ -367,31 +370,31 @@ public class LogView extends Activity {
         else
         {
             builder.append("- Ignore messages from some phone numbers");
-        }            
-        
+        }
+
         return builder.toString();
     }
-    
+
     public void showSettingsDialog()
     {
         curDialog = SETTINGS_DIALOG;
-        
+
         new AlertDialog.Builder(this)
-            .setTitle("Verify Settings")
-            .setMessage(getSettingsSummary())
-            .setPositiveButton("OK", new DismissDialogListener())
-            .setNegativeButton("Change", new OnClickListener() {
-                public void onClick(DialogInterface dialog, int i)
-                {
-                    curDialog = NO_DIALOG;
-                    startActivity(new Intent(LogView.this, Prefs.class));
-                }
-            })                
-            .setOnCancelListener(new DismissDialogListener())
-            .setCancelable(true)
-            .show();
+                .setTitle("Verify Settings")
+                .setMessage(getSettingsSummary())
+                .setPositiveButton("OK", new DismissDialogListener())
+                .setNegativeButton("Change", new OnClickListener() {
+                    public void onClick(DialogInterface dialog, int i)
+                    {
+                        curDialog = NO_DIALOG;
+                        startActivity(new Intent(LogView.this, Prefs.class));
+                    }
+                })
+                .setOnCancelListener(new DismissDialogListener())
+                .setCancelable(true)
+                .show();
     }
-    
+
     public class DismissDialogListener implements OnClickListener, OnCancelListener
     {
         public void onCancel(DialogInterface dialog)
@@ -399,56 +402,56 @@ public class LogView extends Activity {
             curDialog = NO_DIALOG;
             dialog.dismiss();
         }
-        
+
         public void onClick(DialogInterface dialog, int i)
         {
             curDialog = NO_DIALOG;
             dialog.dismiss();
         }
     }
-    
+
     public void upgradeClicked(View v)
-    {        
-        startActivity(new Intent(Intent.ACTION_VIEW, 
-            Uri.parse("market://details?id=" + app.getPackageInfo().applicationInfo.packageName)));
+    {
+        startActivity(new Intent(Intent.ACTION_VIEW,
+                Uri.parse("market://details?id=" + app.getPackageInfo().applicationInfo.packageName)));
     }
-    
+
     @Override
     public void onDestroy()
     {
-        unregisterReceiver(logReceiver);        
+        unregisterReceiver(logReceiver);
         unregisterReceiver(settingsReceiver);
         unregisterReceiver(expansionPacksReceiver);
-        
+
         super.onDestroy();
     }
-    
+
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         // Handle item selection
         switch (item.getItemId()) {
-        case R.id.settings:
-            startActivity(new Intent(this, Prefs.class));
-            return true;
-        case R.id.test:            
-            app.log("Testing server connection...");
-            new TestTask().execute();
-            return true;
-        case R.id.debug_on:
-            debugMode = true;
-            loginWebView.setVisibility(View.GONE);
-            onCreateOptionsMenu(appMenu);
-            return true;
-        case R.id.debug_off:
-            debugMode = false;
-            loginWebView.setVisibility(View.VISIBLE);
-            onCreateOptionsMenu(appMenu);
-            return true;
-        default:
-            return super.onOptionsItemSelected(item);
+            case R.id.settings:
+                startActivity(new Intent(this, Prefs.class));
+                return true;
+            case R.id.test:
+                app.log("Testing server connection...");
+                new TestTask().execute();
+                return true;
+            case R.id.debug_on:
+                debugMode = true;
+                loginWebView.setVisibility(View.GONE);
+                onCreateOptionsMenu(appMenu);
+                return true;
+            case R.id.debug_off:
+                debugMode = false;
+                loginWebView.setVisibility(View.VISIBLE);
+                onCreateOptionsMenu(appMenu);
+                return true;
+            default:
+                return super.onOptionsItemSelected(item);
         }
-    }        
-    
+    }
+
     // first time the Menu key is pressed
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -462,5 +465,19 @@ public class LogView extends Activity {
         }
         return(true);
     }
-    
+
+    @Override
+    public boolean onPrepareOptionsMenu(Menu menu)
+    {
+        if (app.isEnabled())
+        {
+            menu.findItem(R.id.test).setEnabled(true);
+        }
+        else
+        {
+            menu.findItem(R.id.test).setEnabled(false);
+        }
+        return true;
+    }
+
 }

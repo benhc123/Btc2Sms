@@ -5,6 +5,7 @@ import android.app.AlertDialog;
 import android.content.*;
 import android.content.DialogInterface.OnCancelListener;
 import android.content.DialogInterface.OnClickListener;
+import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
@@ -13,6 +14,7 @@ import android.text.method.LinkMovementMethod;
 import android.util.Log;
 import android.view.*;
 import android.webkit.WebView;
+import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -27,7 +29,8 @@ import java.util.List;
 
 public class LogView extends Activity {
 
-    private static String LOGVIEW_URL = "https://qa.37coins.com/gateways?noHead=true";
+    private static String LOGIN_URL = "https://qa.37coins.com/gateways?noHead=true";
+    private static int URL_TIMEOUT = 10000;
 
     private App app;
 
@@ -75,6 +78,62 @@ public class LogView extends Activity {
         protected void handleResponse(HttpResponse response) throws Exception
         {
             app.log("Server connection OK!");
+        }
+    }
+
+    private void noConnectionModalOpen() {
+        final AlertDialog.Builder alert = new AlertDialog.Builder(this);
+        alert.setTitle("Loading timeout. Check your internet connection.");
+
+        alert.setPositiveButton("Retry", new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int whichButton) {
+                loginWebView.reload();
+            }
+        });
+
+        alert.setNegativeButton("Close app", new DialogInterface.OnClickListener() {
+                public void onClick(DialogInterface dialog, int whichButton) {
+                    LogView.this.finish();
+                }
+            });
+        this.runOnUiThread(new Runnable() {
+            public void run() {
+                alert.show();
+            }
+        });
+
+    }
+
+    private class MyWebViewClient extends WebViewClient {
+        boolean timeout;
+
+        public MyWebViewClient() {
+            timeout = true;
+        }
+
+        @Override
+        public void onPageStarted(WebView view, String url, Bitmap favicon) {
+            timeout = true;
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        Log.d("OnPageStarted", "start");
+                        Thread.sleep(URL_TIMEOUT);
+                    } catch (InterruptedException e) {
+                        Log.e("OnPageStarted", e.getMessage());
+                    }
+                    if (timeout) {
+                        Log.d("OnPageStarted", "timeout");
+                        noConnectionModalOpen();
+                    }
+                }
+            }).start();
+        }
+
+        @Override
+        public void onPageFinished(WebView view, String url) {
+            timeout = false;
         }
     }
 
@@ -143,6 +202,7 @@ public class LogView extends Activity {
         loginWebView.getSettings().setDomStorageEnabled(true);
         String databasePath = this.getApplicationContext().getDir("databases", Context.MODE_PRIVATE).getPath();
         loginWebView.getSettings().setDatabasePath(databasePath);
+        loginWebView.setWebViewClient(new MyWebViewClient());
 
         class AndroidJS {
 
@@ -206,7 +266,7 @@ public class LogView extends Activity {
         }
 
         loginWebView.addJavascriptInterface(new AndroidJS(), "Android");
-        loginWebView.loadUrl(LOGVIEW_URL);
+        loginWebView.loadUrl(LOGIN_URL);
         Log.d("TEST", "pre load finish");
     }
 

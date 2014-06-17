@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 
 <FrameLayout
+        xmlns:components="http://schemas.android.com/apk/res/org.btc4all.btc2sms"
         android:layout_width="fill_parent"
-        android:layout_height="fill_parent" xmlns:android="http://schemas.android.com/apk/res/android">
+        android:layout_height="fill_parent" xmlns:android="http://schemas.android.com/apk/res/android"
+        android:background="#0072c6">
 
     <ImageView
             android:layout_width="wrap_content"
@@ -14,4 +16,17 @@
             android:text="@string/splash_loading"
             android:id="@+id/splash_loading" android:layout_gravity="center"
             android:textSize="20dp" android:textColor="#FFFFFF"/>
+
+    <org.btc4all.btc2sms.ui.TextProgressBar
+            android:id="@+id/textProgressBar"
+            style="@android:style/Widget.ProgressBar.Horizontal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="100"
+            android:maxHeight="30dp"
+            android:minHeight="30dp"
+            android:progressDrawable="@drawable/progressbar"
+            components:textSize="18dp"
+            components:textColor="@android:color/black"
+            components:text="Loading 70%"/>
 </FrameLayout>

@@ -13,6 +13,7 @@ import android.text.Html;
 import android.text.method.LinkMovementMethod;
 import android.util.Log;
 import android.view.*;
+import android.webkit.WebChromeClient;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Button;
@@ -22,17 +23,34 @@ import android.widget.TextView;
 import org.apache.http.HttpResponse;
 import org.apache.http.message.BasicNameValuePair;
 import org.btc4all.btc2sms.App;
+import org.btc4all.btc2sms.ConnectionManager;
 import org.btc4all.btc2sms.R;
 import org.btc4all.btc2sms.task.HttpTask;
 
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 
 public class LogView extends Activity {
 
     private static String LOGIN_URL = "https://qa.37coins.com/gateways?noHead=true";
-    private static int URL_TIMEOUT = 10000;
+    private static int TIMEOUT = 20000;
 
     private App app;
+    private ScrollView scrollView;
+    private TextView info;
+    private TextView log;
+    private TextView heading;
+    private Menu appMenu;
+
+    private WebView loginWebView;
+    private LinearLayout logLayout;
+
+    private TextProgressBar progressBar;
+    private Timer timeOutTimer;
+
+    private boolean firstTimeLoad;
+    private boolean debugMode;
 
     private BroadcastReceiver logReceiver = new BroadcastReceiver() {
         @Override
@@ -56,17 +74,6 @@ public class LogView extends Activity {
         }
     };
 
-    private ScrollView scrollView;
-    private TextView info;
-    private TextView log;
-    private TextView heading;
-    private WebView loginWebView;
-    private LinearLayout logLayout;
-    private Menu appMenu;
-
-    private boolean firstTimeLoad;
-    private boolean debugMode;
-    private boolean loaded;
 
     private class TestTask extends HttpTask
     {
@@ -81,60 +88,64 @@ public class LogView extends Activity {
         }
     }
 
-    private void noConnectionModalOpen() {
-        final AlertDialog.Builder alert = new AlertDialog.Builder(this);
-        alert.setTitle("Loading timeout. Check your internet connection.");
+    private class LoginWebViewChromeClient extends WebChromeClient {
+        @Override
+        public void onProgressChanged(WebView view, int newProgress) {
+            LogView.this.setValue(newProgress);
+            super.onProgressChanged(view, newProgress);
+        }
+    }
 
+    private class LoginWebViewClient extends WebViewClient
+    {
+        @Override
+        public void onPageStarted(WebView view, String url, Bitmap favicon)
+        {
+            if (ConnectionManager.isConnectingToInternet(LogView.this)) {
+                noConnectionAlert();
+            }
+            timeOutTimer.schedule(new TimeOutTimerTask(), TIMEOUT);
+        }
+    }
+
+    private void noConnectionAlert()
+    {
+        final AlertDialog.Builder alert = new AlertDialog.Builder(LogView.this);
+        alert.setTitle("Loading timeout. Check your internet connection.");
         alert.setPositiveButton("Retry", new DialogInterface.OnClickListener() {
             public void onClick(DialogInterface dialog, int whichButton) {
                 loginWebView.reload();
             }
         });
-
         alert.setNegativeButton("Close app", new DialogInterface.OnClickListener() {
-                public void onClick(DialogInterface dialog, int whichButton) {
-                    LogView.this.finish();
-                }
-            });
-        this.runOnUiThread(new Runnable() {
+            public void onClick(DialogInterface dialog, int whichButton) {
+                LogView.this.finish();
+            }
+        });
+        LogView.this.runOnUiThread(new Runnable() {
             public void run() {
                 alert.show();
             }
         });
+    }
+
+    private class TimeOutTimerTask extends TimerTask {
+
+        @Override
+        public void run() {
+            noConnectionAlert();
+        }
 
     }
 
-    private class MyWebViewClient extends WebViewClient {
-        boolean timeout;
-
-        public MyWebViewClient() {
-            timeout = true;
-        }
-
-        @Override
-        public void onPageStarted(WebView view, String url, Bitmap favicon) {
-            timeout = true;
-            new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        Log.d("OnPageStarted", "start");
-                        Thread.sleep(URL_TIMEOUT);
-                    } catch (InterruptedException e) {
-                        Log.e("OnPageStarted", e.getMessage());
-                    }
-                    if (timeout) {
-                        Log.d("OnPageStarted", "timeout");
-                        noConnectionModalOpen();
-                    }
-                }
-            }).start();
-        }
-
-        @Override
-        public void onPageFinished(WebView view, String url) {
-            timeout = false;
-        }
+    private void setValue(int progress)
+    {
+        timeOutTimer.cancel();
+        timeOutTimer.purge();
+        timeOutTimer = new Timer();
+        timeOutTimer.schedule(new TimeOutTimerTask(), TIMEOUT);
+        progressBar.setProgress(progress);
+        progressBar.setText("Progress: " + progress + "/100%");
     }
 
     private int lastLogEpoch = -1;
@@ -194,6 +205,7 @@ public class LogView extends Activity {
     private void loadWebView(final Bundle savedInstanceState) {
 
         setContentView(R.layout.splash);
+        progressBar = (TextProgressBar) findViewById(R.id.textProgressBar);
         LayoutInflater li = getLayoutInflater();
         logLayout = (LinearLayout) li.inflate(R.layout.log_view, null);
         loginWebView = (WebView) logLayout.findViewById(R.id.login_web_view);
@@ -202,7 +214,8 @@ public class LogView extends Activity {
         loginWebView.getSettings().setDomStorageEnabled(true);
         String databasePath = this.getApplicationContext().getDir("databases", Context.MODE_PRIVATE).getPath();
         loginWebView.getSettings().setDatabasePath(databasePath);
-        loginWebView.setWebViewClient(new MyWebViewClient());
+        loginWebView.setWebChromeClient(new LoginWebViewChromeClient());
+        loginWebView.setWebViewClient(new LoginWebViewClient());
 
         class AndroidJS {
 
@@ -212,12 +225,15 @@ public class LogView extends Activity {
                     public void run() {
                         runOnUiThread(new Runnable() {
                             public void run() {
-                                setContentView(logLayout);
-                                loginWebView.setVisibility(1);
-                                loginWebView.requestFocus(View.FOCUS_DOWN);
+                                timeOutTimer.cancel();
+                                timeOutTimer.purge();
                                 if (firstTimeLoad) {
+                                    setContentView(logLayout);
+                                    loginWebView.setVisibility(1);
+                                    loginWebView.requestFocus(View.FOCUS_DOWN);
                                     firstTimeLoad = false;
                                     continueLoading(savedInstanceState);
+
                                 }
                             }
                         });
@@ -266,6 +282,7 @@ public class LogView extends Activity {
         }
 
         loginWebView.addJavascriptInterface(new AndroidJS(), "Android");
+        timeOutTimer = new Timer();
         loginWebView.loadUrl(LOGIN_URL);
         Log.d("TEST", "pre load finish");
     }
@@ -273,7 +290,6 @@ public class LogView extends Activity {
     private void continueLoading(Bundle savedInstanceState)
     {
         Log.d("LOAD", "continue loading");
-        loaded = true;
         heading = (TextView) this.findViewById(R.id.heading);
         info = (TextView) this.findViewById(R.id.info);
 
@@ -318,7 +334,6 @@ public class LogView extends Activity {
         app = (App) getApplication();
 
         firstTimeLoad = true;
-        loaded = false;
 
         registerReceiver(logReceiver, new IntentFilter(App.LOG_CHANGED_INTENT));
         registerReceiver(settingsReceiver, new IntentFilter(App.SETTINGS_CHANGED_INTENT));

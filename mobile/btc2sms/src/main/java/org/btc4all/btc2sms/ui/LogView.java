@@ -101,10 +101,15 @@ public class LogView extends Activity {
         @Override
         public void onPageStarted(WebView view, String url, Bitmap favicon)
         {
-            if (ConnectionManager.isConnectingToInternet(LogView.this)) {
-                noConnectionAlert();
-            }
             timeOutTimer.schedule(new TimeOutTimerTask(), TIMEOUT);
+        }
+
+        @Override
+        public void onReceivedError(WebView view, int errorCode, String description, String failingUrl)
+        {
+            timeOutTimer.cancel();
+            timeOutTimer.purge();
+            noConnectionAlert();
         }
     }
 
@@ -114,7 +119,12 @@ public class LogView extends Activity {
         alert.setTitle("Loading timeout. Check your internet connection.");
         alert.setPositiveButton("Retry", new DialogInterface.OnClickListener() {
             public void onClick(DialogInterface dialog, int whichButton) {
-                loginWebView.reload();
+                if (!ConnectionManager.isConnectingToInternet(LogView.this)) {
+                    noConnectionAlert();
+                }
+                else {
+                    loginWebView.reload();
+                }
             }
         });
         alert.setNegativeButton("Close app", new DialogInterface.OnClickListener() {
@@ -145,7 +155,7 @@ public class LogView extends Activity {
         timeOutTimer = new Timer();
         timeOutTimer.schedule(new TimeOutTimerTask(), TIMEOUT);
         progressBar.setProgress(progress);
-        progressBar.setText("Progress: " + progress + "/100%");
+        progressBar.setText("Progress: " + progress + "%");
     }
 
     private int lastLogEpoch = -1;
@@ -206,6 +216,7 @@ public class LogView extends Activity {
 
         setContentView(R.layout.splash);
         progressBar = (TextProgressBar) findViewById(R.id.textProgressBar);
+        progressBar.setText("Progress: 0%");
         LayoutInflater li = getLayoutInflater();
         logLayout = (LinearLayout) li.inflate(R.layout.log_view, null);
         loginWebView = (WebView) logLayout.findViewById(R.id.login_web_view);
@@ -283,7 +294,12 @@ public class LogView extends Activity {
 
         loginWebView.addJavascriptInterface(new AndroidJS(), "Android");
         timeOutTimer = new Timer();
-        loginWebView.loadUrl(LOGIN_URL);
+        if (ConnectionManager.isConnectingToInternet(this)) {
+            loginWebView.loadUrl(LOGIN_URL);
+        } else {
+            noConnectionAlert();
+
+        }
         Log.d("TEST", "pre load finish");
     }
 

@@ -17,7 +17,7 @@
                         android:centerColor="#0072c6"
                         android:centerY="0.75"
                         android:endColor="#0072c6"
-                        android:startColor="#ffffff" />
+                        android:startColor="#0072c6" />
             </shape>
         </clip>
     </item>

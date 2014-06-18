@@ -152,10 +152,15 @@ public class LogView extends Activity {
     {
         timeOutTimer.cancel();
         timeOutTimer.purge();
+        progressBar.setProgress(progress);
+        if (progress == 100)
+        {
+            progressBar.setText("Starting now...");
+            return;
+        }
         timeOutTimer = new Timer();
         timeOutTimer.schedule(new TimeOutTimerTask(), TIMEOUT);
-        progressBar.setProgress(progress);
-        progressBar.setText("Progress: " + progress + "%");
+        progressBar.setText("Loading: " + progress + "%");
     }
 
     private int lastLogEpoch = -1;
@@ -212,8 +217,9 @@ public class LogView extends Activity {
         loadWebView(savedInstanceState);
     }
 
-    private void loadWebView(final Bundle savedInstanceState) {
-
+    private void loadWebView(final Bundle savedInstanceState)
+    {
+        firstTimeLoad = true;
         setContentView(R.layout.splash);
         progressBar = (TextProgressBar) findViewById(R.id.textProgressBar);
         progressBar.setText("Progress: 0%");

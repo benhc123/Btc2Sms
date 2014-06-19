@@ -6,7 +6,7 @@
     <item android:id="@+id/settings"
           android:icon="@drawable/ic_menu_equalizer"
           android:title="@string/settings" />
-    <item android:id="@+id/test"
+    <item android:id="@id/test"
           android:icon="@drawable/ic_menu_link"
           android:title="@string/test" />
 </menu>

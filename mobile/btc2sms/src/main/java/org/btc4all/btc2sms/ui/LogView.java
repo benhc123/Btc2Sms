@@ -5,6 +5,7 @@ import android.app.AlertDialog;
 import android.content.*;
 import android.content.DialogInterface.OnCancelListener;
 import android.content.DialogInterface.OnClickListener;
+import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
@@ -12,8 +13,9 @@ import android.text.Html;
 import android.text.method.LinkMovementMethod;
 import android.util.Log;
 import android.view.*;
-import android.webkit.WebSettings;
+import android.webkit.WebChromeClient;
 import android.webkit.WebView;
+import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -21,67 +23,152 @@ import android.widget.TextView;
 import org.apache.http.HttpResponse;
 import org.apache.http.message.BasicNameValuePair;
 import org.btc4all.btc2sms.App;
+import org.btc4all.btc2sms.ConnectionManager;
 import org.btc4all.btc2sms.R;
 import org.btc4all.btc2sms.task.HttpTask;
 
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 
 public class LogView extends Activity {
 
+    private static String LOGIN_URL = "https://qa.37coins.com/gateways?noHead=true";
+    private static int TIMEOUT = 20000;
+
     private App app;
-    
+    private ScrollView scrollView;
+    private TextView info;
+    private TextView log;
+    private TextView heading;
+    private Menu appMenu;
+
+    private WebView loginWebView;
+    private LinearLayout logLayout;
+
+    private TextProgressBar progressBar;
+    private Timer timeOutTimer;
+
+    private boolean firstTimeLoad;
+    private boolean debugMode;
+
     private BroadcastReceiver logReceiver = new BroadcastReceiver() {
         @Override
-        public void onReceive(Context context, Intent intent) {  
+        public void onReceive(Context context, Intent intent) {
             updateLogView();
         }
     };
-    
+
     private BroadcastReceiver settingsReceiver = new BroadcastReceiver() {
         @Override
-        public void onReceive(Context context, Intent intent) {  
+        public void onReceive(Context context, Intent intent) {
             updateUpgradeButton();
             updateInfo();
         }
-    };    
-    
+    };
+
     private BroadcastReceiver expansionPacksReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
             updateInfo();
         }
-    };        
+    };
 
-    private ScrollView scrollView;
-    private TextView info;
-    private TextView log;
-    private TextView heading;
-    private WebView loginWebView;
-    private LinearLayout logLayout;
-    private Menu appMenu;
 
-    private boolean firstTimeLoad;
-    private boolean debugMode;
-    
     private class TestTask extends HttpTask
     {
         public TestTask() {
-            super(LogView.this.app, new BasicNameValuePair("action", App.ACTION_TEST));   
+            super(LogView.this.app, new BasicNameValuePair("action", App.ACTION_TEST));
         }
 
         @Override
-        protected void handleResponse(HttpResponse response) throws Exception 
+        protected void handleResponse(HttpResponse response) throws Exception
         {
-            app.log("Server connection OK!");            
+            app.log("Server connection OK!");
         }
     }
-    
+
+    private class LoginWebViewChromeClient extends WebChromeClient {
+        @Override
+        public void onProgressChanged(WebView view, int newProgress) {
+            LogView.this.setValue(newProgress);
+            super.onProgressChanged(view, newProgress);
+        }
+    }
+
+    private class LoginWebViewClient extends WebViewClient
+    {
+        @Override
+        public void onPageStarted(WebView view, String url, Bitmap favicon)
+        {
+            timeOutTimer.schedule(new TimeOutTimerTask(), TIMEOUT);
+        }
+
+        @Override
+        public void onReceivedError(WebView view, int errorCode, String description, String failingUrl)
+        {
+            timeOutTimer.cancel();
+            timeOutTimer.purge();
+            noConnectionAlert();
+        }
+    }
+
+    private void noConnectionAlert()
+    {
+        final AlertDialog.Builder alert = new AlertDialog.Builder(LogView.this);
+        alert.setTitle("Loading timeout. Check your internet connection.");
+        alert.setPositiveButton("Retry", new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int whichButton) {
+                if (!ConnectionManager.isConnectingToInternet(LogView.this)) {
+                    noConnectionAlert();
+                }
+                else {
+                    loginWebView.reload();
+                }
+            }
+        });
+        alert.setNegativeButton("Close app", new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int whichButton) {
+                LogView.this.finish();
+            }
+        });
+        LogView.this.runOnUiThread(new Runnable() {
+            public void run() {
+                alert.show();
+            }
+        });
+    }
+
+    private class TimeOutTimerTask extends TimerTask {
+
+        @Override
+        public void run() {
+            noConnectionAlert();
+        }
+
+    }
+
+    private void setValue(int progress)
+    {
+        timeOutTimer.cancel();
+        timeOutTimer.purge();
+        progressBar.setProgress(progress);
+        if (progress == 100)
+        {
+            progressBar.setText("Starting now...");
+            return;
+        }
+        timeOutTimer = new Timer();
+        timeOutTimer.schedule(new TimeOutTimerTask(), TIMEOUT);
+        progressBar.setText("Loading: " + progress + "%");
+    }
+
     private int lastLogEpoch = -1;
 
     public void updateUpgradeButton()
     {
         Button upgradeButton = (Button) this.findViewById(R.id.upgrade_button);
-        boolean isUpgradeAvailable = app.isUpgradeAvailable();                
+        boolean isUpgradeAvailable = app.isUpgradeAvailable();
         if (isUpgradeAvailable)
         {
             upgradeButton.setText("New version of app available ("+app.getMarketVersionName()+").\nClick to install...");
@@ -91,46 +178,62 @@ public class LogView extends Activity {
         {
             upgradeButton.setVisibility(View.GONE);
         }
-                
+
     }
-    
+
     public synchronized void updateLogView()
-    {                   
-        int logEpoch = app.getLogEpoch();
-        CharSequence displayedLog = app.getDisplayedLog();        
-        int logEpoch2 = app.getLogEpoch();
-        
-        if (lastLogEpoch == logEpoch && logEpoch == logEpoch2)
-        {
-            int beforeLen = log.getText().length();
-            int afterLen = displayedLog.length();
-            
-            if (beforeLen == afterLen)
-            {                
-                return;
+    {
+        if (log != null && scrollView != null) {
+            int logEpoch = app.getLogEpoch();
+            CharSequence displayedLog = app.getDisplayedLog();
+            int logEpoch2 = app.getLogEpoch();
+
+            if (lastLogEpoch == logEpoch && logEpoch == logEpoch2) {
+                int beforeLen = log.getText().length();
+                int afterLen = displayedLog.length();
+
+                if (beforeLen == afterLen) {
+                    return;
+                }
+
+                log.append(displayedLog, beforeLen, afterLen);
+            } else {
+                log.setText(displayedLog);
+                lastLogEpoch = logEpoch;
             }
-            
-            log.append(displayedLog, beforeLen, afterLen);
+
+            scrollView.post(new Runnable() {
+                public void run() {
+                    scrollView.fullScroll(View.FOCUS_DOWN);
+                }
+            });
         }
-        else
-        {
-            log.setText(displayedLog);
-            lastLogEpoch = logEpoch;
-        }
-                
-        scrollView.post(new Runnable() { public void run() { 
-            scrollView.fullScroll(View.FOCUS_DOWN);
-        } });
     }
 
-    private void loadWebView(final Bundle savedInstanceState) {
+    private void load(Bundle savedInstanceState)
+    {
+        Log.d("LOAD", "start");
+        PreferenceManager.setDefaultValues(this, R.xml.prefs, false);
+        loadWebView(savedInstanceState);
+    }
 
+    private void loadWebView(final Bundle savedInstanceState)
+    {
+        firstTimeLoad = true;
         setContentView(R.layout.splash);
+        progressBar = (TextProgressBar) findViewById(R.id.textProgressBar);
+        progressBar.setText("Progress: 0%");
         LayoutInflater li = getLayoutInflater();
         logLayout = (LinearLayout) li.inflate(R.layout.log_view, null);
         loginWebView = (WebView) logLayout.findViewById(R.id.login_web_view);
-        WebSettings webSettings = loginWebView.getSettings();
-        webSettings.setJavaScriptEnabled(true);
+        loginWebView.getSettings().setJavaScriptEnabled(true);
+        loginWebView.getSettings().setDatabaseEnabled(true);
+        loginWebView.getSettings().setDomStorageEnabled(true);
+        String databasePath = this.getApplicationContext().getDir("databases", Context.MODE_PRIVATE).getPath();
+        loginWebView.getSettings().setDatabasePath(databasePath);
+        loginWebView.setWebChromeClient(new LoginWebViewChromeClient());
+        loginWebView.setWebViewClient(new LoginWebViewClient());
+
         class AndroidJS {
 
             public void loadComplete() {
@@ -139,18 +242,22 @@ public class LogView extends Activity {
                     public void run() {
                         runOnUiThread(new Runnable() {
                             public void run() {
-                                setContentView(logLayout);
-                                loginWebView.setVisibility(1);
-                                loginWebView.requestFocus(View.FOCUS_DOWN);
+                                timeOutTimer.cancel();
+                                timeOutTimer.purge();
                                 if (firstTimeLoad) {
+                                    setContentView(logLayout);
+                                    loginWebView.setVisibility(1);
+                                    loginWebView.requestFocus(View.FOCUS_DOWN);
                                     firstTimeLoad = false;
                                     continueLoading(savedInstanceState);
+
                                 }
                             }
                         });
                     }
                 };
                 viewThread.start();
+
             }
 
             public void setConfig(String basePath, String cn, String mobile, String apiSecret, String servicePath, String password) {
@@ -190,17 +297,21 @@ public class LogView extends Activity {
                 viewThread.start();
             }
         }
-        loginWebView.addJavascriptInterface(new AndroidJS(), "Android");
 
-        loginWebView.loadUrl("https://www.37coins.com/gateways?noHead=true");
+        loginWebView.addJavascriptInterface(new AndroidJS(), "Android");
+        timeOutTimer = new Timer();
+        if (ConnectionManager.isConnectingToInternet(this)) {
+            loginWebView.loadUrl(LOGIN_URL);
+        } else {
+            noConnectionAlert();
+
+        }
         Log.d("TEST", "pre load finish");
     }
 
     private void continueLoading(Bundle savedInstanceState)
     {
-
-        PreferenceManager.setDefaultValues(this, R.xml.prefs, false);
-
+        Log.d("LOAD", "continue loading");
         heading = (TextView) this.findViewById(R.id.heading);
         info = (TextView) this.findViewById(R.id.info);
 
@@ -234,13 +345,14 @@ public class LogView extends Activity {
                 showSettingsDialog();
             }
         }
+        Log.d("LOAD", "finished loading");
     }
-            
+
     /** Called when the activity is first created. */
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        
+
         app = (App) getApplication();
 
         firstTimeLoad = true;
@@ -249,7 +361,7 @@ public class LogView extends Activity {
         registerReceiver(settingsReceiver, new IntentFilter(App.SETTINGS_CHANGED_INTENT));
         registerReceiver(expansionPacksReceiver, new IntentFilter(App.EXPANSION_PACKS_CHANGED_INTENT));
 
-        loadWebView(savedInstanceState);
+        load(savedInstanceState);
 
     }
 
@@ -257,68 +369,68 @@ public class LogView extends Activity {
     public static final int UPGRADE_DIALOG = 1;
     public static final int CONFIGURE_SUCCESS_DIALOG = 2;
     public static final int SETTINGS_DIALOG = 3;
-    
+
     private int curDialog = NO_DIALOG;
-    
+
     public void updateInfo()
-    {       
+    {
         boolean enabled = app.isEnabled();
         heading.setText(Html.fromHtml(
-             enabled ? "<b>" + getText(R.string.running) + " ("+app.getPhoneNumber()+")</b>" 
-                : "<b>" +getText(R.string.disabled) + "</b>"));       
-        
+                enabled ? "<b>" + getText(R.string.running) + " ("+app.getPhoneNumber()+")</b>"
+                        : "<b>" +getText(R.string.disabled) + "</b>"));
         if (enabled)
         {
             info.setText("New messages will be forwarded to server");
-            
+
             if (app.isTestMode())
             {
                 info.append("\n(Test mode enabled)");
-            }            
+            }
+
         }
         else
         {
-            info.setText("New messages will not be forwarded to server");   
+            info.setText("New messages will not be forwarded to server");
         }
-       
+
     }
-    
+
     public void infoClicked(View v)
     {
-        startActivity(new Intent(this, Prefs.class));        
+        startActivity(new Intent(this, Prefs.class));
     }
-    
+
     @Override
     protected void onSaveInstanceState(Bundle outState)
     {
         super.onSaveInstanceState(outState);
-        
+
         outState.putInt("cur_dialog", curDialog);
-    }    
-    
+    }
+
     public void showUpgradeDialog()
     {
         curDialog = UPGRADE_DIALOG;
-        
+
         new AlertDialog.Builder(this)
-            .setTitle("Upgrade available")
-            .setMessage("A new version of the app is available ("+app.getMarketVersionName()+"). Do you want to upgrade now?")
-            .setPositiveButton("OK", new OnClickListener() {
-                public void onClick(DialogInterface dialog, int i)
-                {
-                    upgradeClicked(null);
-                }
-            })                
-            .setNegativeButton("Not Now", new DismissDialogListener())
-            .setOnCancelListener(new DismissDialogListener())
-            .setCancelable(true)
-            .show();
-    }    
-    
+                .setTitle("Upgrade available")
+                .setMessage("A new version of the app is available ("+app.getMarketVersionName()+"). Do you want to upgrade now?")
+                .setPositiveButton("OK", new OnClickListener() {
+                    public void onClick(DialogInterface dialog, int i)
+                    {
+                        upgradeClicked(null);
+                    }
+                })
+                .setNegativeButton("Not Now", new DismissDialogListener())
+                .setOnCancelListener(new DismissDialogListener())
+                .setCancelable(true)
+                .show();
+    }
+
     public String getSettingsSummary()
     {
         StringBuilder builder = new StringBuilder();
-        
+
         if (app.getKeepInInbox())
         {
             builder.append("- New messages kept in Messaging inbox\n");
@@ -327,7 +439,7 @@ public class LogView extends Activity {
         {
             builder.append("- New messages not kept in Messaging inbox\n");
         }
-        
+
         if (app.callNotificationsEnabled())
         {
             builder.append("- Call notifications enabled\n");
@@ -336,14 +448,14 @@ public class LogView extends Activity {
         {
             builder.append("- Call notifications disabled\n");
         }
-        
+
         List<String> ignoredNumbers = app.getIgnoredPhoneNumbers();
         boolean ignoreShortcodes = app.ignoreShortcodes();
         boolean ignoreNonNumeric = app.ignoreNonNumeric();
         boolean testMode = app.isTestMode();
-        
-        builder.append("- Send up to " + app.getOutgoingMessageLimit()+ " SMS/hour\n");        
-        
+
+        builder.append("- Send up to " + app.getOutgoingMessageLimit()+ " SMS/hour\n");
+
         if (ignoredNumbers.isEmpty() && !ignoreShortcodes && !ignoreNonNumeric && !testMode)
         {
             builder.append("- Forward messages from all phone numbers");
@@ -355,31 +467,31 @@ public class LogView extends Activity {
         else
         {
             builder.append("- Ignore messages from some phone numbers");
-        }            
-        
+        }
+
         return builder.toString();
     }
-    
+
     public void showSettingsDialog()
     {
         curDialog = SETTINGS_DIALOG;
-        
+
         new AlertDialog.Builder(this)
-            .setTitle("Verify Settings")
-            .setMessage(getSettingsSummary())
-            .setPositiveButton("OK", new DismissDialogListener())
-            .setNegativeButton("Change", new OnClickListener() {
-                public void onClick(DialogInterface dialog, int i)
-                {
-                    curDialog = NO_DIALOG;
-                    startActivity(new Intent(LogView.this, Prefs.class));
-                }
-            })                
-            .setOnCancelListener(new DismissDialogListener())
-            .setCancelable(true)
-            .show();
+                .setTitle("Verify Settings")
+                .setMessage(getSettingsSummary())
+                .setPositiveButton("OK", new DismissDialogListener())
+                .setNegativeButton("Change", new OnClickListener() {
+                    public void onClick(DialogInterface dialog, int i)
+                    {
+                        curDialog = NO_DIALOG;
+                        startActivity(new Intent(LogView.this, Prefs.class));
+                    }
+                })
+                .setOnCancelListener(new DismissDialogListener())
+                .setCancelable(true)
+                .show();
     }
-    
+
     public class DismissDialogListener implements OnClickListener, OnCancelListener
     {
         public void onCancel(DialogInterface dialog)
@@ -387,56 +499,56 @@ public class LogView extends Activity {
             curDialog = NO_DIALOG;
             dialog.dismiss();
         }
-        
+
         public void onClick(DialogInterface dialog, int i)
         {
             curDialog = NO_DIALOG;
             dialog.dismiss();
         }
     }
-    
+
     public void upgradeClicked(View v)
-    {        
-        startActivity(new Intent(Intent.ACTION_VIEW, 
-            Uri.parse("market://details?id=" + app.getPackageInfo().applicationInfo.packageName)));
+    {
+        startActivity(new Intent(Intent.ACTION_VIEW,
+                Uri.parse("market://details?id=" + app.getPackageInfo().applicationInfo.packageName)));
     }
-    
+
     @Override
     public void onDestroy()
     {
-        unregisterReceiver(logReceiver);        
+        unregisterReceiver(logReceiver);
         unregisterReceiver(settingsReceiver);
         unregisterReceiver(expansionPacksReceiver);
-        
+
         super.onDestroy();
     }
-    
+
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         // Handle item selection
         switch (item.getItemId()) {
-        case R.id.settings:
-            startActivity(new Intent(this, Prefs.class));
-            return true;
-        case R.id.test:            
-            app.log("Testing server connection...");
-            new TestTask().execute();
-            return true;
-        case R.id.debug_on:
-            debugMode = true;
-            loginWebView.setVisibility(View.GONE);
-            onCreateOptionsMenu(appMenu);
-            return true;
-        case R.id.debug_off:
-            debugMode = false;
-            loginWebView.setVisibility(View.VISIBLE);
-            onCreateOptionsMenu(appMenu);
-            return true;
-        default:
-            return super.onOptionsItemSelected(item);
+            case R.id.settings:
+                startActivity(new Intent(this, Prefs.class));
+                return true;
+            case R.id.test:
+                app.log("Testing server connection...");
+                new TestTask().execute();
+                return true;
+            case R.id.debug_on:
+                debugMode = true;
+                loginWebView.setVisibility(View.GONE);
+                onCreateOptionsMenu(appMenu);
+                return true;
+            case R.id.debug_off:
+                debugMode = false;
+                loginWebView.setVisibility(View.VISIBLE);
+                onCreateOptionsMenu(appMenu);
+                return true;
+            default:
+                return super.onOptionsItemSelected(item);
         }
-    }        
-    
+    }
+
     // first time the Menu key is pressed
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -450,5 +562,19 @@ public class LogView extends Activity {
         }
         return(true);
     }
-    
+
+    @Override
+    public boolean onPrepareOptionsMenu(Menu menu)
+    {
+        if (app.isEnabled())
+        {
+            menu.findItem(R.id.test).setEnabled(true);
+        }
+        else
+        {
+            menu.findItem(R.id.test).setEnabled(false);
+        }
+        return true;
+    }
+
 }

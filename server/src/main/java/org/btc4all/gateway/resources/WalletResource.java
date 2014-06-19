@@ -11,7 +11,6 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
 
 import net.sf.ehcache.Cache;
 import net.sf.ehcache.Element;
@@ -20,14 +19,14 @@ import org.bitcoinj.wallet.Protos;
 import org.bitcoinj.wallet.Protos.Key;
 import org.btc4all.gateway.pojo.WalletRequest;
 
+import com.google.bitcoin.core.NetworkParameters;
 import com.google.bitcoin.core.Sha256Hash;
-import com.google.bitcoin.crypto.ChildNumber;
 import com.google.bitcoin.crypto.DeterministicKey;
 import com.google.bitcoin.crypto.MnemonicCode;
+import com.google.bitcoin.params.TestNet3Params;
 import com.google.bitcoin.store.UnreadableWalletException;
 import com.google.bitcoin.wallet.DeterministicSeed;
 import com.google.bitcoin.wallet.KeyChainGroup;
-import com.google.common.collect.ImmutableList;
 
 
 @Path(WalletResource.PATH)
@@ -38,6 +37,7 @@ public class WalletResource {
     private static int LOOKAHEAD_SIZE = 1;
     private static String STORAGE_KEY = "cainBackup";
     private Cache cache;
+    private NetworkParameters params = TestNet3Params.get();
     
     @Inject 
     public WalletResource(Cache cache){
@@ -50,26 +50,13 @@ public class WalletResource {
     @POST
     public WalletRequest create(WalletRequest rw) throws UnreadableWalletException{
         KeyChainGroup kcg = getKeyChain();
-        //find unused account
-        boolean keyExists = true;
-        int i = 0;
-        do {
-            try{
-                kcg.getActiveKeyChain().getKey(ImmutableList.of(new ChildNumber(i, true)));
-                i++;
-            }catch(IllegalArgumentException e){
-                keyExists = false;
-            }
-        } while (keyExists);
-        i--;
         //create key and return
-        DeterministicKey account = kcg.getActiveKeyChain().getKey(ImmutableList.of(new ChildNumber(i, true)), true);
-        kcg.addShadow(account.getPath(), Arrays.asList(rw.getXpub()));
+        kcg.addFollowingAccounts(Arrays.asList(DeterministicKey.deserializeB58(null, rw.getXpub())));
         
         //persist changes
         List<Key> keys = kcg.serializeToProtobuf();
         cache.put(new Element(STORAGE_KEY,keys));
-        return new WalletRequest().setXpub(account.serializePubB58()).setAccountId(Integer.toString(i));
+        return new WalletRequest().setXpub(kcg.getActiveKeyChain().getWatchingKey().serializePubB58()).setAccountId("0");
     }
     
     /**
@@ -79,17 +66,10 @@ public class WalletResource {
     @GET
     @Path("/account/{account}")
     public WalletRequest get(@PathParam("account") String account) throws UnreadableWalletException{
+        if (Integer.parseInt(account)!=0)
+            throw new WebApplicationException(404);
         KeyChainGroup kcg = getKeyChain();
-        int a = Integer.parseInt(account);
-        ImmutableList<ChildNumber> path = ImmutableList.of(new ChildNumber(a, true));
-        DeterministicKey key = null;
-        try{
-            key = kcg.getActiveKeyChain().getKey(path);
-        }catch(IllegalArgumentException e){
-            throw new WebApplicationException(e, Response.Status.NOT_FOUND);
-        }
-        
-        return new WalletRequest().setXpub(key.serializePubB58());
+        return new WalletRequest().setXpub(kcg.getActiveKeyChain().getWatchingKey().serializePubB58());
     }
     
     @SuppressWarnings("unchecked")
@@ -99,11 +79,11 @@ public class WalletResource {
         if (e!=null){
             //get keychaingroup from storage
             List<Protos.Key> keys = (List<Protos.Key>)e.getObjectValue();
-            kcg = KeyChainGroup.fromProtobufUnencrypted(keys);
+            kcg = KeyChainGroup.fromProtobufUnencrypted(params, keys);
         }else{
             //create chain
             DeterministicSeed seed = new DeterministicSeed(SEED, MnemonicCode.BIP39_STANDARDISATION_TIME_SECS);
-            kcg = new KeyChainGroup(seed);
+            kcg = new KeyChainGroup(params, seed);
             kcg.setLookaheadSize(LOOKAHEAD_SIZE);
             kcg.getActiveKeyChain();
             //persist

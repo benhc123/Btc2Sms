@@ -3,11 +3,13 @@ package org.btc4all.gateway;
 import java.io.IOException;
 import java.util.LinkedHashMap;
 
-import org.btc4all.gateway.pojo.EnvayaEvent;
-import org.btc4all.gateway.pojo.EnvayaEvent.Event;
-import org.btc4all.gateway.pojo.EnvayaMessage;
-import org.btc4all.gateway.pojo.EnvayaRequest.Status;
 
+import com._37coins.EnvayaClient;
+import com._37coins.EnvayaClientException;
+import com._37coins.pojo.EnvayaEvent;
+import com._37coins.pojo.EnvayaMessage;
+import com._37coins.pojo.EnvayaEvent.Event;
+import com._37coins.pojo.EnvayaRequest.Status;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.plivo.helper.api.client.RestAPI;
 import com.plivo.helper.exception.PlivoException;

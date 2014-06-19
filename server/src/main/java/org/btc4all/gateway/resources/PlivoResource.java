@@ -9,11 +9,11 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
-import org.btc4all.gateway.EnvayaClient;
-import org.btc4all.gateway.EnvayaClientException;
-import org.btc4all.gateway.pojo.EnvayaRequest.MessageType;
-import org.btc4all.gateway.pojo.EnvayaResponse;
 
+import com._37coins.EnvayaClient;
+import com._37coins.EnvayaClientException;
+import com._37coins.pojo.EnvayaResponse;
+import com._37coins.pojo.EnvayaRequest.MessageType;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 

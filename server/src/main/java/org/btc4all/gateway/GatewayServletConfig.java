@@ -13,6 +13,7 @@ import net.sf.ehcache.store.MemoryStoreEvictionPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com._37coins.EnvayaClient;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Provides;
@@ -60,8 +61,10 @@ public class GatewayServletConfig extends GuiceServletContextListener {
 		final Injector i = getInjector();
 		EnvayaClient client = i.getInstance(EnvayaClient.class);
 		factory = i.getInstance(ConnectionFactory.class);
-		act = new AmqpConsumerThread(GatewayServletConfig.envayaUser, factory, client);
-		act.start();
+		if (null!=envayaUser){
+		    act = new AmqpConsumerThread(GatewayServletConfig.envayaUser, factory, client);
+		    act.start();
+		}
 		log.info("ServletContextListener started");
 	}
 	

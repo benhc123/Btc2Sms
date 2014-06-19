@@ -29,6 +29,7 @@ import com.google.bitcoin.core.PeerGroup;
 import com.google.bitcoin.core.Sha256Hash;
 import com.google.bitcoin.core.Transaction;
 import com.google.bitcoin.core.Wallet;
+import com.google.bitcoin.crypto.DeterministicKey;
 import com.google.bitcoin.crypto.MnemonicCode;
 import com.google.bitcoin.params.TestNet3Params;
 import com.google.bitcoin.store.BlockStore;
@@ -75,7 +76,7 @@ public class WalletClient {
         NetworkParameters params = TestNet3Params.get();
         //set up keychaingroup
         DeterministicSeed seed = new DeterministicSeed(SEED, MnemonicCode.BIP39_STANDARDISATION_TIME_SECS);
-        KeyChainGroup kcg = new KeyChainGroup(seed);
+        KeyChainGroup kcg = new KeyChainGroup(params, seed);
         kcg.setLookaheadSize(LOOKAHEAD_SIZE);
         DeterministicKeyChain kc = kcg.getActiveKeyChain();
         String xpub1 = kc.getWatchingKey().serializePubB58();
@@ -85,10 +86,11 @@ public class WalletClient {
         WalletRequest wr = wc.create(xpub1);
         String xpub2 = wr.getXpub();
         System.out.println(kc.getWatchingKey().toString());
-        kcg.addShadow(kc.getWatchingKey().getPath(), Arrays.asList(xpub2));
+        kcg.addFollowingAccounts(Arrays.asList(DeterministicKey.deserializeB58(null, xpub2)));
         
         //get wallet and peergroup going
         Wallet wallet=new Wallet(params, kcg);
+        System.out.println(kcg.freshAddress(KeyPurpose.RECEIVE_FUNDS));
         BlockStore blockStore = new MemoryBlockStore(params);
         chain = new BlockChain(params, wallet, blockStore);
         PeerGroup peerGroup = new PeerGroup(params, chain);

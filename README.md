@@ -1,52 +1,10 @@
+#SMSgateway
 
-# Vision
+The SMSgateway is a network node that enables SMS-based application to be delivered to any caller-id in a mobile network. To do so, it mediates the connection between the GSM network and the Internet.
 
-Let's assume we want to bring Bitcoin to the 4 Billion people that are not connected to the internet, and let's further assume we want to do it by SMS, because feature phones have high global penetration. Let's then build an android app that is open source, works in a mesh network to be censorship resistant and can be installed on cheap devices to infiltrate any providers network and open a wallet for any participant.
+The first application built on it is a simple Bitcoin wallet.
 
-EnvayaSMS architecture was a central control server. The objective is to get rid of it step by step and create the previously described architecture.
-
-
-## Build
-
-enter the "mobile" directory
-set `<sdk><path>` in `mobile/pom.xml`, then build with `mvn clean install`
-
-If you want a different way to set your `<sdk><path>`, here is a link to some instructions on how to set your <sdk><path> in your .m2/settings.xml: 
-code.google.com/p/playn/wiki/MavenAndroidBuild. 
-
-## Build for Release
-
-###Here is all you need to start a release build:
-
-###Step 1: go to mobile/btc2sms
-
-###Step 2:
-mvn install -P release -Dsign.keystore=REPLACEWITHPATHTOKEYSTORE -Dsign.alias=REPLACEWITHALIAS -Dsign.storepass=REPLACEWITHKEYSTOREPASSWORD -Dsign.keypass=REPLACEWITHKEYPASSWORD
-
-For example:
--Dsign.keystore=/home/dmitrycrocodilys/37coins_client/secure_area/37coins_dummy_keystore.keystore
--Dsign.alias=37dev
--Dsign.storepass="KeYsToRe PaSsWoRd GoEs HeRe"
--Dsign.keypass="37DeV KeY PaSsWoRd GoEs HeRe"
-
-http://developer.android.com/tools/publishing/app-signing.html
-
-## Tip4Commit
-
-[![tip for next commit](http://tip4commit.com/projects/530.svg)](http://tip4commit.com/projects/530)
-
-## Old EnvayaSMS README.md
-
-
-EnvayaSMS is an Android app that acts as a SMS and MMS gateway. 
-
-For more information and installation instructions, 
-see http://sms.envaya.org/
-
-This project uses ant (or NetBeans) as the build tool.
-Before building, first create a local.properties file in the project root directory,
-and set sdk.dir to the path of your android sdk, e.g.:
-
-`sdk.dir=C:\\android-sdk`
+## License
 
 The code is released under the MIT license; see LICENSE
+

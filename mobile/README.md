@@ -13,26 +13,24 @@ Some pictures here...
 ## Build
 
 1. Enter the project directory:
-```
-cd mobile/btc2sms
-```
-
+  ```
+  cd mobile/btc2sms
+  ```
 2. Execute build:
-```
-mvn clean package -Dandroid.sdk.path=<path>
-```
+  ```
+  mvn clean package -Dandroid.sdk.path=<path>
+  ```
 
 ## Build for Release
 
 1. Enter the project directory:
-```
-cd mobile/btc2sms
-```
-
+  ```
+  cd mobile/btc2sms
+  ```
 2. Execute signed build:
-```cmd
-mvn install -P release -Dsign.keystore=<keystore> -Dsign.alias=<alias> -Dsign.storepass=<storepass> -Dsign.keypass=<keypass>
-```
+  ```cmd
+  mvn install -P release -Dsign.keystore=<keystore> -Dsign.alias=<alias> -Dsign.storepass=<storepass> -Dsign.keypass=<keypass>
+  ```
 
 Example:
 ```

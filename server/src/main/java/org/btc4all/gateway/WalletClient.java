@@ -1,9 +1,12 @@
 package org.btc4all.gateway;
 
+import static com.google.bitcoin.core.Coin.CENT;
+
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.Arrays;
 import java.util.Calendar;
+import java.util.concurrent.ExecutionException;
 
 import org.apache.http.HttpRequest;
 import org.apache.http.HttpResponse;
@@ -22,13 +25,17 @@ import org.btc4all.gateway.resources.WalletResource;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.bitcoin.core.AbstractWalletEventListener;
+import com.google.bitcoin.core.Address;
+import com.google.bitcoin.core.AddressFormatException;
 import com.google.bitcoin.core.BlockChain;
 import com.google.bitcoin.core.Coin;
+import com.google.bitcoin.core.InsufficientMoneyException;
 import com.google.bitcoin.core.NetworkParameters;
 import com.google.bitcoin.core.PeerGroup;
 import com.google.bitcoin.core.Sha256Hash;
 import com.google.bitcoin.core.Transaction;
 import com.google.bitcoin.core.Wallet;
+import com.google.bitcoin.core.Wallet.SendRequest;
 import com.google.bitcoin.crypto.DeterministicKey;
 import com.google.bitcoin.crypto.MnemonicCode;
 import com.google.bitcoin.params.TestNet3Params;
@@ -70,8 +77,12 @@ public class WalletClient {
      * @param args
      * @throws IOException 
      * @throws BlockStoreException 
+     * @throws AddressFormatException 
+     * @throws InsufficientMoneyException 
+     * @throws ExecutionException 
+     * @throws InterruptedException 
      */
-    public static void main(String[] args) throws IOException, BlockStoreException {
+    public static void main(String[] args) throws IOException, BlockStoreException, InsufficientMoneyException, AddressFormatException, InterruptedException, ExecutionException {
         BlockChain chain = null;
         NetworkParameters params = TestNet3Params.get();
         //set up keychaingroup
@@ -86,10 +97,10 @@ public class WalletClient {
         WalletRequest wr = wc.create(xpub1);
         String xpub2 = wr.getXpub();
         System.out.println(kc.getWatchingKey().toString());
-        kcg.addFollowingAccounts(Arrays.asList(DeterministicKey.deserializeB58(null, xpub2)));
+        kcg.addFollowingAccountKeys(Arrays.asList(DeterministicKey.deserializeB58(null, xpub2)));
         
         //get wallet and peergroup going
-        Wallet wallet=new Wallet(params, kcg);
+        Wallet wallet=new Wallet(params, kcg, new _37TransactionSigner());
         System.out.println(kcg.freshAddress(KeyPurpose.RECEIVE_FUNDS));
         BlockStore blockStore = new MemoryBlockStore(params);
         chain = new BlockChain(params, wallet, blockStore);
@@ -116,6 +127,10 @@ public class WalletClient {
         peerGroup.startAsync();
         peerGroup.downloadBlockChain();
         System.out.println("available balance: "+wallet.getBalance());
+        // send bitcoins back
+        SendRequest req = SendRequest.to(new Address(params, "mwmT2K1fnrsbHfqUTeGFbunbvT5FxWnt1t"), CENT);
+        wallet.completeTx(req);
+        peerGroup.broadcastTransaction(req.tx).get();
     }
     
     public WalletRequest get(String account) throws IOException{

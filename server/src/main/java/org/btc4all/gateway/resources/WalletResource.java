@@ -51,7 +51,7 @@ public class WalletResource {
     public WalletRequest create(WalletRequest rw) throws UnreadableWalletException{
         KeyChainGroup kcg = getKeyChain();
         //create key and return
-        kcg.addFollowingAccounts(Arrays.asList(DeterministicKey.deserializeB58(null, rw.getXpub())));
+        kcg.addFollowingAccountKeys(Arrays.asList(DeterministicKey.deserializeB58(null, rw.getXpub())));
         
         //persist changes
         List<Key> keys = kcg.serializeToProtobuf();

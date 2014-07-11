@@ -24,12 +24,9 @@ import com.rabbitmq.client.ConnectionFactory;
 
 public class GatewayServletConfig extends GuiceServletContextListener {
     public static String mobile;
-    public static String restEndpoint;
-	public static String restPassword;
 	public static String amqpHost;
 	public static String envayaUser;
 	public static String envayaPassword;
-	public static String basePath;
 	public static String gatewayPath;
 	public static String envayaPath;
 	public static String envayaToken;
@@ -42,15 +39,12 @@ public class GatewayServletConfig extends GuiceServletContextListener {
 
 	static {
 		mobile = System.getProperty("mobile");
-		restEndpoint = System.getProperty("restEndpoint");
-		restPassword = System.getProperty("restPassword");
 		amqpHost = System.getProperty("amqpHost");
 		envayaUser = System.getProperty("envayaUser");
 		envayaPassword = System.getProperty("envayaPassword");
 		plivoKey = System.getProperty("plivoKey");
         plivoSecret = System.getProperty("plivoSecret");
         envayaPath = System.getProperty("envayaPath");
-        basePath = System.getProperty("basePath");
         gatewayPath = System.getProperty("gatewayPath");
         envayaToken = System.getProperty("envayaToken");
 	}

@@ -4,7 +4,7 @@ EnvayaSMS' source code is licensed under the MIT license:
 
 -----
 
-Copyright (C) 2011 by Nir Yariv, Jesse Young
+Copyright (C) 2014 by Nir Yariv, Jesse Young
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -40,5 +40,5 @@ org.envaya.sms.ForegroundService include code from Android,
     See NOTICE
     
 server/php/example/www/test.html uses code from crypto-js,
-    Copyright (c) 2011, Jeff Mott,
+    Copyright (c) 2014, Jeff Mott,
     released under new BSD license

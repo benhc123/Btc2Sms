@@ -41,9 +41,11 @@ public class AmqpConsumerThread extends Thread {
         while (isActive){
             Connection connection = null;
             QueueingConsumer consumer = null;
+	    Channel channel = null;
             try {
+		factory.setAutomaticRecoveryEnabled(true);
                 connection = factory.newConnection();
-                Channel channel = connection.createChannel();
+		channel = connection.createChannel();
                 consumer = new QueueingConsumer(channel);
                 channel.basicConsume(queueName, true, consumer);
             } catch (IOException e) {
@@ -76,12 +78,15 @@ public class AmqpConsumerThread extends Thread {
                     }else{
                         System.out.println("undigested message: "+om.writeValueAsString(e));
                     }
-                } catch (ShutdownSignalException | ConsumerCancelledException| InterruptedException | IOException e) {
+		} catch (ShutdownSignalException | ConsumerCancelledException| IOException e) {
                     e.printStackTrace();
+		} catch (InterruptedException e2){
+		    e2.printStackTrace();
                     isActive = false;
                 } finally{
                     if (null!=connection){
                         try {
+			    channel.close();
                             connection.close();
                         } catch (IOException e) {
                         }

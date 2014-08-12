@@ -82,7 +82,7 @@ public class WalletResource {
             kcg = KeyChainGroup.fromProtobufUnencrypted(params, keys);
         }else{
             //create chain
-            DeterministicSeed seed = new DeterministicSeed(SEED, MnemonicCode.BIP39_STANDARDISATION_TIME_SECS);
+	    DeterministicSeed seed = new DeterministicSeed(SEED, "password", MnemonicCode.BIP39_STANDARDISATION_TIME_SECS);
             kcg = new KeyChainGroup(params, seed);
             kcg.setLookaheadSize(LOOKAHEAD_SIZE);
             kcg.getActiveKeyChain();

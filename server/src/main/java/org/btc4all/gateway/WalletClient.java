@@ -39,6 +39,7 @@ import com.google.bitcoin.core.Wallet.SendRequest;
 import com.google.bitcoin.crypto.DeterministicKey;
 import com.google.bitcoin.crypto.MnemonicCode;
 import com.google.bitcoin.params.TestNet3Params;
+import com.google.bitcoin.signers.TestP2SHTransactionSigner;
 import com.google.bitcoin.store.BlockStore;
 import com.google.bitcoin.store.BlockStoreException;
 import com.google.bitcoin.store.MemoryBlockStore;
@@ -46,10 +47,9 @@ import com.google.bitcoin.wallet.DeterministicKeyChain;
 import com.google.bitcoin.wallet.DeterministicSeed;
 import com.google.bitcoin.wallet.KeyChain.KeyPurpose;
 import com.google.bitcoin.wallet.KeyChainGroup;
+import com.google.common.collect.ImmutableList;
 
 public class WalletClient {
-    private static byte[] SEED = Sha256Hash.create("never ever use a string seed like this for your wallet".getBytes()).getBytes();
-    private static int LOOKAHEAD_SIZE = 10;
     private HttpClient httpClient;
     private String url;
     
@@ -71,66 +71,6 @@ public class WalletClient {
     public WalletClient(String url) {
         httpClient = getClientBuilder().build();
         this.url = url;
-    }
-
-    /**
-     * @param args
-     * @throws IOException 
-     * @throws BlockStoreException 
-     * @throws AddressFormatException 
-     * @throws InsufficientMoneyException 
-     * @throws ExecutionException 
-     * @throws InterruptedException 
-     */
-    public static void main(String[] args) throws IOException, BlockStoreException, InsufficientMoneyException, AddressFormatException, InterruptedException, ExecutionException {
-        BlockChain chain = null;
-        NetworkParameters params = TestNet3Params.get();
-        //set up keychaingroup
-        DeterministicSeed seed = new DeterministicSeed(SEED, MnemonicCode.BIP39_STANDARDISATION_TIME_SECS);
-        KeyChainGroup kcg = new KeyChainGroup(params, seed);
-        kcg.setLookaheadSize(LOOKAHEAD_SIZE);
-        DeterministicKeyChain kc = kcg.getActiveKeyChain();
-        String xpub1 = kc.getWatchingKey().serializePubB58();
-        
-        //get second half of wallet
-        WalletClient wc = new WalletClient("http://127.0.0.1:8080" + WalletResource.PATH);
-        WalletRequest wr = wc.create(xpub1);
-        String xpub2 = wr.getXpub();
-        System.out.println(kc.getWatchingKey().toString());
-        kcg.addFollowingAccountKeys(Arrays.asList(DeterministicKey.deserializeB58(null, xpub2)));
-        
-        //get wallet and peergroup going
-        Wallet wallet=new Wallet(params, kcg, new _37TransactionSigner());
-        System.out.println(kcg.freshAddress(KeyPurpose.RECEIVE_FUNDS));
-        BlockStore blockStore = new MemoryBlockStore(params);
-        chain = new BlockChain(params, wallet, blockStore);
-        PeerGroup peerGroup = new PeerGroup(params, chain);
-        Calendar cal = Calendar.getInstance();
-        cal.add(Calendar.DATE, -1);
-        long now = cal.getTimeInMillis() / 1000;
-        peerGroup.setFastCatchupTimeSecs(now);
-        peerGroup.setUserAgent("bip38 claimer", "0.1");
-        peerGroup.addAddress(InetAddress.getLocalHost());
-        peerGroup.addWallet(wallet);
-        
-        //create lookahead
-        wallet.freshAddress(KeyPurpose.RECEIVE_FUNDS);
-        
-        //run and display balance
-        wallet.addEventListener(new AbstractWalletEventListener() {
-            @Override
-            public synchronized void onCoinsReceived(Wallet w, Transaction tx, Coin prevBalance, Coin newBalance) {
-                System.out.println("\nReceived tx " + tx.getHashAsString());
-                System.out.println(tx.toString());
-            }
-        });
-        peerGroup.startAsync();
-        peerGroup.downloadBlockChain();
-        System.out.println("available balance: "+wallet.getBalance());
-        // send bitcoins back
-        SendRequest req = SendRequest.to(new Address(params, "mwmT2K1fnrsbHfqUTeGFbunbvT5FxWnt1t"), CENT);
-        wallet.completeTx(req);
-        peerGroup.broadcastTransaction(req.tx).get();
     }
     
     public WalletRequest get(String account) throws IOException{

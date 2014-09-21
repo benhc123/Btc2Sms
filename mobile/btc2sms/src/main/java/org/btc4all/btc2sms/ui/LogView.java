@@ -33,7 +33,7 @@ import java.util.TimerTask;
 
 public class LogView extends Activity {
 
-    private static String LOGIN_URL = "https://qa.37coins.com/gateways?noHead=true";
+    private static String LOGIN_URL = "https://www.37coins.com/gateways?noHead=true";
     private static int TIMEOUT = 20000;
 
     private App app;

@@ -18,7 +18,7 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.WRITE_SETTINGS"/>
 
-    <application android:debuggable="false" android:icon="@drawable/icon" android:label="@string/app_name" android:name="org.btc4all.btc2sms.App">
+    <application android:debuggable="true" android:icon="@drawable/icon" android:label="@string/app_name" android:name="org.btc4all.btc2sms.App">
 
         <activity android:name="org.btc4all.btc2sms.ui.Main" android:noHistory="true">
             <intent-filter>
